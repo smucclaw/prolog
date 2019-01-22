@@ -10,7 +10,7 @@ module Database
 where
 
 import Data.Map (Map)
-import qualified Data.Map as Map
+import qualified Data.Map.Strict as Map
 
 import Syntax
 
@@ -28,7 +28,7 @@ newtype Database = DB (Map Signature [Clause])
 hasPredicate sig (DB index) = Map.member sig index
 
 createDB clauses emptyPredicates = DB $
-   foldr (\clause -> Map.insertWith' (++) (signature (lhs clause)) [clause])
+   foldr (\clause -> Map.insertWith (++) (signature (lhs clause)) [clause])
          (Map.fromList [ (signature (Struct name []), []) | name <- emptyPredicates ])
          clauses
 
