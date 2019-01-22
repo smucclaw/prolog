@@ -1,11 +1,10 @@
 Name:                prolog
-Version:             0.2.0.1
+Version:             0.2.1
 Synopsis:            A Prolog interpreter written in Haskell.
-Description:         A Prolog interpreter written in Haskell.
+Description:         A Prolog interpreter written in Haskell. Implements a subset of the Prolog language.
 License:             PublicDomain
 Author:              Matthias Bartsch
-Maintainer:          none
-Homepage:            https://github.com/Erdwolf/prolog
+Maintainer:          Marcel Fourné (haskell@marcelfourne.de)
 Category:            Language
 Build-type:          Simple
 Cabal-version:       >=1.6
@@ -29,8 +28,12 @@ Library
     parsec >= 3.1.1,
     syb >= 0.3,
     mtl >= 2.0.1.0,
-    containers >=0.4 && <0.5,
+    containers,
 
     template-haskell,
     th-lift >=0.5.3,
     transformers >=0.2.2.0
+
+source-repository head
+  type: git
+  location: https://github.com/mfourne/prolog
