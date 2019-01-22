@@ -11,7 +11,7 @@ import Control.Monad.State
 import Control.Monad.Error
 import Data.Maybe (isJust)
 import Data.Generics (everywhere, mkT)
-import Control.Applicative ((<$>),(<*>),(<$),(<*), Applicative(..), Alternative(..))
+import Control.Applicative ((<$>),(<*>),(<$),(<*), Applicative(..))
 import Data.List (sort, nub)
 
 import Syntax
@@ -78,6 +78,7 @@ builtins =
    eval (Struct "*" [t1, t2])   = (*) <$> eval t1 <*> eval t2
    eval (Struct "-" [t1, t2])   = (-) <$> eval t1 <*> eval t2
    eval (Struct "mod" [t1, t2]) = mod <$> eval t1 <*> eval t2
+   eval (Struct "div" [t1, t2]) = div <$> eval t1 <*> eval t2
    eval (Struct "-" [t])        = negate <$> eval t
    eval _                       = mzero
 
@@ -109,13 +110,13 @@ instance (MonadTrace m, MonadTrans t, Monad (t m)) => MonadTrace (t m) where
    trace x = lift (trace x)
 
 
-newtype Trace m a = Trace { withTrace :: m a }  deriving (Functor, Applicative, Monad, MonadError e)
+newtype Trace m a = Trace { withTrace :: m a }  deriving (Functor, Monad, MonadError e)
 
 trace_ label x = trace (label++":\t"++show x)
 
 
 class Monad m => MonadGraphGen m where
-   createConnections :: Unifier -> [Goal] -> [Branch] -> m ()
+   createConnections :: Branch -> [Branch] -> [Branch] -> m ()
    markSolution :: Unifier -> m ()
    markCutBranches :: Stack -> m ()
 
@@ -125,32 +126,34 @@ instance MonadGraphGen m => MonadGraphGen (ReaderT r m) where
    markCutBranches = lift . markCutBranches
 
 
-newtype NoGraphT m a = NoGraphT {runNoGraphT :: m a} deriving (Monad, Functor, MonadFix, MonadPlus, Applicative, Alternative, MonadError e)
+newtype NoGraphT m a = NoGraphT {runNoGraphT :: m a} deriving (Monad, Functor, MonadFix, MonadPlus, Applicative, MonadError e)
 instance MonadTrans NoGraphT where
    lift = NoGraphT
 
 instance Monad m => MonadGraphGen (NoGraphT m) where
    createConnections _ _ _ = NoGraphT $ return ()
-   markSolution      _     = NoGraphT $ return ()
-   markCutBranches   _     = NoGraphT $ return ()
+   markSolution      _      = NoGraphT $ return ()
+   markCutBranches   _      = NoGraphT $ return ()
 
 
-type Stack = [(Unifier, [Goal], [Branch])]
-type Branch = (Unifier, [Goal])
+type Stack = [(Branch, [Branch])]
+type Branch = (Path, Unifier, [Goal])
+type Path = [Integer] -- Used for generating graph output
+root = [] :: Path
 
 resolve :: (Functor m, MonadTrace m, Error e, MonadError e m) => Program -> [Goal] -> m [Unifier]
 resolve program goals = runNoGraphT (resolve_ program goals)
 
 resolve_ :: (Functor m, MonadTrace m, Error e, MonadError e m, MonadGraphGen m) => Program -> [Goal] -> m [Unifier]
 -- Yield all unifiers that resolve <goal> using the clauses from <program>.
-resolve_ program goals = map cleanup <$> runReaderT (resolve' 1 [] goals []) (createDB (builtins ++ program) ["false","fail"])   -- NOTE Is it a good idea to "hardcode" the builtins like this?
+resolve_ program goals = map cleanup <$> runReaderT (resolve' 1 (root, [], goals) []) (createDB (builtins ++ program) ["false","fail"])   -- NOTE Is it a good idea to "hardcode" the builtins like this?
   where
       cleanup = filter ((\(VariableName i _) -> i == 0) . fst)
 
       whenPredicateIsUnknown sig action = asks (hasPredicate sig) >>= flip unless action
 
       --resolve' :: Int -> Unifier -> [Goal] -> Stack -> m [Unifier]
-      resolve' depth usf [] stack = do
+      resolve' depth (path, usf, []) stack = do
          trace "=== yield solution ==="
          trace_ "Depth" depth
          trace_ "Unif." usf
@@ -158,52 +161,76 @@ resolve_ program goals = map cleanup <$> runReaderT (resolve' 1 [] goals []) (cr
          markSolution usf
 
          (cleanup usf:) <$> backtrack depth stack
-      resolve' depth usf (Cut n:gs) stack = do
+      resolve' depth (path, usf, Cut n:gs) stack = do
          trace "=== resolve' (Cut) ==="
          trace_ "Depth"   depth
          trace_ "Unif."   usf
          trace_ "Goals"   (Cut n:gs)
          mapM_ (trace_ "Stack") stack
 
-         createConnections usf (Cut n:gs) [(usf, gs)]
+         createConnections (path, usf, Cut n:gs) [(1:path,[],[])] [(1:path, usf, gs)]
 
          markCutBranches (take n stack)
 
-         resolve' depth usf gs (drop n stack)
-      resolve' depth usf goals@(Struct "asserta" [fact]:gs) stack = do
+         resolve' depth (1:path, usf, gs) (drop n stack)
+      resolve' depth (path, usf, goals@(Struct "asserta" [fact]:gs)) stack = do
          trace "=== resolve' (asserta/1) ==="
          trace_ "Depth"   depth
          trace_ "Unif."   usf
          trace_ "Goals"   goals
          mapM_ (trace_ "Stack") stack
 
-         createConnections usf goals [(usf, gs)]
+         createConnections (path, usf, goals) [(1:path,[],[])] [(1:path, usf, gs)]
 
-         local (asserta fact) $ resolve' depth usf gs stack
-      resolve' depth usf goals@(Struct "assertz" [fact]:gs) stack = do
+         local (asserta fact) $ resolve' depth (1:path, usf, gs) stack
+      resolve' depth (path, usf, goals@(Struct "assertz" [fact]:gs)) stack = do
          trace "=== resolve' (assertz/1) ==="
          trace_ "Depth"   depth
          trace_ "Unif."   usf
          trace_ "Goals"   goals
          mapM_ (trace_ "Stack") stack
 
-         createConnections usf goals [(usf, gs)]
+         createConnections (path, usf, goals) [(1:path,[],[])] [(1:path, usf, gs)]
 
-         local (assertz fact) $ resolve' depth usf gs stack
-      resolve' depth usf goals@(Struct "retract" [t]:gs) stack = do
+         local (assertz fact) $ resolve' depth (1:path, usf, gs) stack
+      resolve' depth (path, usf, goals@(Struct "retract" [t]:gs)) stack = do
          trace "=== resolve' (retract/1) ==="
          trace_ "Depth"   depth
          trace_ "Unif."   usf
          trace_ "Goals"   goals
          mapM_ (trace_ "Stack") stack
 
-         createConnections usf goals [(usf, gs)]
+         createConnections (path, usf, goals) [(1:path,[],[])] [(1:path, usf, gs)]
 
          clauses <- asks (getClauses t)
          case [ t' | Clause t' [] <- clauses, isJust (unify t t') ] of
             []       -> return (fail "retract/1")
-            (fact:_) -> local (abolish fact) $ resolve' depth usf gs stack
-      resolve' depth usf (nextGoal:gs) stack = do
+            (fact:_) -> local (abolish fact) $ resolve' depth (1:path, usf, gs) stack
+      resolve' depth (path, usf, goals@(nextGoal@(Struct "=" [l,r]):gs)) stack = do
+         -- This special case is here to avoid introducing unnecessary
+         -- variables that occur when applying "X=X." as a rule.
+         trace "=== resolve' (=/2) ==="
+         trace_ "Depth"   depth
+         trace_ "Unif."   usf
+         trace_ "Goals"   goals
+         mapM_ (trace_ "Stack") stack
+
+         let bs = [ (1:path,u,[]) | u <- unify l r ]
+         let branches = do
+             (p,u,[]) <- bs
+             let u'  = usf +++ u
+                 gs' = map (apply u') gs
+                 gs'' = everywhere (mkT shiftCut) gs'
+             return (p, u', gs'')
+
+         createConnections (path, usf, nextGoal:gs) bs branches
+
+         choose depth (path,usf,gs) branches stack
+
+        where
+         shiftCut (Cut n) = Cut (succ n)
+         shiftCut t       = t
+      resolve' depth (path, usf, nextGoal:gs) stack = do
          trace "=== resolve' ==="
          trace_ "Depth"   depth
          trace_ "Unif."   usf
@@ -212,43 +239,46 @@ resolve_ program goals = map cleanup <$> runReaderT (resolve' 1 [] goals []) (cr
          let sig = signature nextGoal
          whenPredicateIsUnknown sig $ do
             throwError $ strMsg $ "Unknown predicate: " ++ show sig
-         branches <- getBranches
-
-         createConnections usf (nextGoal:gs) branches
-
-         choose depth usf gs branches stack
-       where
-         getBranches = do
-            clauses <- asks (getClauses nextGoal)
-            return $ do
-               clause <- renameVars clauses
-               u <- unify (apply usf nextGoal) (lhs clause)
-               let newGoals = rhs clause (map snd u)
+         bs <- getProtoBranches -- Branch generation happens in two phases so visualizers can pick what to display.
+         let branches = do
+               (p, u, newGoals) <- bs
                let u' = usf +++ u
                let gs'  = map (apply u') $ newGoals ++ gs
                let gs'' = everywhere (mkT shiftCut) gs'
-               return (u', gs'')
+               return (p, u', gs'')
+
+         createConnections (path, usf, nextGoal:gs) bs branches
+
+         choose depth (path,usf,gs) branches stack
+       where
+         getProtoBranches = do
+            clauses <- asks (getClauses nextGoal)
+            return $ do
+               (i,clause) <- zip [1..] $ renameVars clauses
+               u <- unify (apply usf nextGoal) (lhs clause)
+               return (i:path, u, rhs clause (map snd u))
+
 
          shiftCut (Cut n) = Cut (succ n)
          shiftCut t       = t
 
          renameVars = everywhere $ mkT $ \(VariableName _ v) -> VariableName depth v
 
-      choose depth _ _  []              stack = backtrack depth stack
-      choose depth u gs ((u',gs'):alts) stack = do
+      choose depth _           []              stack = backtrack depth stack
+      choose depth (path,u,gs) ((path',u',gs'):alts) stack = do
          trace "=== choose ==="
          trace_ "Depth"   depth
          trace_ "Unif."   u
          trace_ "Goals"   gs
-         mapM_ (trace_ "Alt.") ((u',gs'):alts)
+         mapM_ (trace_ "Alt.") ((path',u',gs'):alts)
          mapM_ (trace_ "Stack") stack
-         resolve' (succ depth) u' gs' ((u,gs,alts) : stack)
+         resolve' (succ depth) (path',u',gs') (((path,u,gs),alts) : stack)
 
       backtrack _     [] = do
          trace "=== give up ==="
          return (fail "Goal cannot be resolved!")
-      backtrack depth ((u,gs,alts):stack) = do
+      backtrack depth (((path,u,gs),alts):stack) = do
          trace "=== backtrack ==="
-         choose (pred depth) u gs alts stack
+         choose (pred depth) (path,u,gs) alts stack
 
 

@@ -1,5 +1,5 @@
 module Parser
-   ( consult, parseQuery
+   ( consult, consultString, parseQuery
    , program, whitespace, comment, clause, terms, term, bottom, vname
    ) where
 
@@ -92,7 +92,7 @@ reservedOp = P.reservedOp $ P.makeTokenParser $ emptyDef
 
 charWs c = char c <* whitespace
 
-operatorNames = [ ";", ",", "<", "=..", "=:=", "=<", "=", ">=", ">", "\\=", "is", "*", "+", "-", "\\", "mod", "\\+" ]
+operatorNames = [ ";", ",", "<", "=..", "=:=", "=<", "=", ">=", ">", "\\=", "is", "*", "+", "-", "\\", "mod", "div", "\\+" ]
 
 variable = (Wildcard <$ try (char '_' <* notFollowedBy (alphaNum <|> char '_')))
        <|> Var <$> vname

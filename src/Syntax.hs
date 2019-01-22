@@ -92,8 +92,9 @@ prettyPrint _ _ (Struct a [])   = a
 prettyPrint _ _ (Struct a ts)   = a ++ "(" ++ intercalate ", " (map (prettyPrint True 0) ts) ++ ")"
 prettyPrint _ _ (Var v)         = show v
 prettyPrint _ _ Wildcard        = "_"
-prettyPrint _ _ ((==cut)->True) = "!"
-prettyPrint _ _ (Cut n)         = "!^" ++ show n
+prettyPrint _ _ (Cut _)         = "!"
+--prettyPrint _ _ ((==cut)->True) = "!"
+--prettyPrint _ _ (Cut n)         = "!^" ++ show n
 
 
 spaced s = let h = head s
@@ -115,7 +116,7 @@ operatorTable = concat $ zipWith (map . g) [1..] $ hierarchy False
 
 instance Show VariableName where
    show (VariableName 0 v) = v
-   show (VariableName i v) = show i ++ "#" ++ v
+   show (VariableName i v) = v ++ "#" ++  show i
 
 instance Show Clause where
    show (Clause   lhs [] ) = show $ show lhs
