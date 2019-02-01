@@ -44,9 +44,6 @@ builtins =
    , ClauseFn (Struct "@>="[var "T1", var "T2"]) (binaryPredicate (>=))
    , ClauseFn (Struct "==" [var "T1", var "T2"]) (binaryPredicate (==))
    , ClauseFn (Struct "sort" [var "Input", var "Output"]) (function sort_pl)
-   , Clause (Struct "member" [var "X", Struct "." [var "X", Wildcard]]) []
-   , Clause (Struct "member" [var "X", Struct "." [Wildcard, var "Xs"]])
-                [Struct "member" [var "X", var "Xs"]]
    , ClauseFn (Struct "=.." [var "Term", var "List"]) univ
    , ClauseFn (Struct "atom" [var "T"]) atom
    , ClauseFn (Struct "char_code" [var "Atom", var "Code"]) char_code
@@ -58,8 +55,6 @@ builtins =
                , Struct "=.." [var "Goal", var "L1"]
                , var "Goal"
                ]
-   , Clause (Struct "append" [Struct "[]" [], var "YS", var "YS"]) []
-   , Clause (Struct "append" [Struct "." [var "X", var "XS"], var "YS", Struct "." [var "X", var "XSYS"]]) [Struct "append" [var "XS", var "YS", var "XSYS"]]
    ]
  where
    binaryIntegerPredicate :: (Integer -> Integer -> Bool) -> ([Term] -> [Goal])
