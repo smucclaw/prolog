@@ -5,7 +5,7 @@ module Unifier
    )
 where
 
-import Control.Monad (MonadPlus, mzero)
+import Control.Monad (MonadFail, mzero)
 import Control.Arrow (second)
 import Data.Function (fix)
 import Data.Generics (everything, mkQ)
@@ -16,7 +16,7 @@ type Unifier      = [Substitution]
 type Substitution = (VariableName, Term)
 
 
-unify, unify_with_occurs_check :: MonadPlus m => Term -> Term -> m Unifier
+unify, unify_with_occurs_check :: MonadFail m => Term -> Term -> m Unifier
 
 unify = fix unify'
 
@@ -34,7 +34,7 @@ unify' _ (Var v) t  = return [(v,t)]
 unify' _ t (Var v)  = return [(v,t)]
 unify' self (Struct a1 ts1) (Struct a2 ts2) | a1 == a2 && same length ts1 ts2 =
     unifyList self (zip ts1 ts2)
-unify' _ _ _ = mzero
+unify' _ _ _ = fail "unify'"
 
 same :: Eq b => (a -> b) -> a -> a -> Bool
 same f x y = f x == f y

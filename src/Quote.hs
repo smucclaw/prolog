@@ -9,6 +9,7 @@ import Language.Haskell.TH.Syntax (Lift(lift))
 import Language.Haskell.TH.Lift (deriveLiftMany)
 import Language.Haskell.TH.Quote (QuasiQuoter(..))
 import Text.Parsec (parse, eof, ParsecT)
+import Text.Parsec.String (Parser)
 import Data.Generics (extQ, typeOf, Data)
 
 import Prolog ( Term(..), VariableName, Clause(..), Goal
@@ -26,14 +27,15 @@ ts = prologQuasiQuoter terms   "term list"
 c  = prologQuasiQuoter clause  "clause"
 pl = prologQuasiQuoter program "program"
 
+prologQuasiQuoter :: (Data a, Lift a) => Parser a -> String -> QuasiQuoter
 prologQuasiQuoter parser name =
    QuasiQuoter { quoteExp  = parsePrologExp parser name
                , quotePat  = parsePrologPat parser name
-               , quoteType = fail ("Prolog "++ name ++"s can't be Haskell types!")
-               , quoteDec  = fail ("Prolog "++ name ++"s can't be Haskell declarations!")
+               , quoteType = \ _ -> fail ("Prolog "++ name ++"s can't be Haskell types!")
+               , quoteDec  = \ _ -> fail ("Prolog "++ name ++"s can't be Haskell declarations!")
                }
 
-parsePrologExp :: (Data a, Lift a) => ParsecT [Char] () Identity a -> String -> String -> Q Exp
+parsePrologExp :: (Data a, Lift a) => Parser a -> String -> String -> Q Exp
 parsePrologExp parser name str = do
    case parse (whitespace >> parser <* eof) ("(Prolog " ++ name ++ " expression)") str of
       Right x -> const (fail $ "Quasi-quoted expressions of type " ++ show (typeOf x) ++ " are not implemented.")
@@ -56,7 +58,7 @@ parsePrologExp parser name str = do
       fail "Clauses using Haskell functions are not quasi-quotable."
 
 
-parsePrologPat :: (Data a, Lift a) => ParsecT [Char] () Identity a -> String -> String -> Q Pat
+parsePrologPat :: (Data a, Lift a) => Parser a -> String -> String -> Q Pat
 parsePrologPat parser name str = do
    case parse (whitespace >> parser <* eof) ("(Prolog " ++ name ++ " pattern)") str of
       Right x -> viewP [e| (== $(lift x)) |] [p| True |]
