@@ -5,12 +5,13 @@ module Unifier
    )
 where
 
-import Control.Monad (MonadFail, mzero)
-import Control.Arrow (second)
-import Data.Function (fix)
-import Data.Generics (everything, mkQ)
+import           Control.Arrow      (second)
+import           Control.Monad      (mzero)
+import           Control.Monad.Fail (MonadFail)
+import           Data.Function      (fix)
+import           Data.Generics      (everything, mkQ)
 
-import Syntax
+import           Syntax
 
 type Unifier      = [Substitution]
 type Substitution = (VariableName, Term)
@@ -57,6 +58,6 @@ simplify u = map (second (apply u)) u
 apply :: Unifier -> Term -> Term
 apply = flip $ foldl $ flip substitute
   where
-    substitute (v,t) (Var v') | v == v' = t
-    substitute s     (Struct a ts)      = Struct a (map (substitute s) ts)
-    substitute _     t                  = t
+    substitute (v,t) (Var v')      | v == v' = t
+    substitute s     (Struct a ts) = Struct a (map (substitute s) ts)
+    substitute _     t             = t
