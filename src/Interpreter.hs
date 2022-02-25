@@ -8,7 +8,7 @@ where
 import Control.Monad.Reader
 import Control.Monad.Writer
 import Control.Monad.State
-import Control.Monad.Error
+import Control.Monad.Except
 import Data.Maybe (isJust)
 import Data.Generics (everywhere, mkT)
 import Control.Applicative ((<$>),(<*>),(<$),(<*), Applicative(..), Alternative)
@@ -136,10 +136,10 @@ type Branch = (Path, Unifier, [Goal])
 type Path = [Integer] -- Used for generating graph output
 root = [] :: Path
 
-resolve :: (Functor m, MonadTrace m, Error e, MonadError e m) => Program -> [Goal] -> m [Unifier]
+resolve :: (Functor m, MonadTrace m, MonadError String m) => Program -> [Goal] -> m [Unifier]
 resolve program goals = runNoGraphT (resolve_ program goals)
 
-resolve_ :: (Functor m, MonadTrace m, Error e, MonadError e m, MonadGraphGen m) => Program -> [Goal] -> m [Unifier]
+resolve_ :: (Functor m, MonadTrace m, MonadError String m, MonadGraphGen m) => Program -> [Goal] -> m [Unifier]
 -- Yield all unifiers that resolve <goal> using the clauses from <program>.
 resolve_ program goals = map cleanup <$> runReaderT (resolve' 1 (root, [], goals) []) (createDB (builtins ++ program) ["false","fail"])   -- NOTE Is it a good idea to "hardcode" the builtins like this?
   where
@@ -233,7 +233,7 @@ resolve_ program goals = map cleanup <$> runReaderT (resolve' 1 (root, [], goals
          mapM_ (trace_ "Stack") stack
          let sig = signature nextGoal
          whenPredicateIsUnknown sig $ do
-            throwError $ strMsg $ "Unknown predicate: " ++ show sig
+            throwError $ "Unknown predicate: " ++ show sig
          bs <- getProtoBranches -- Branch generation happens in two phases so visualizers can pick what to display.
          let branches = do
                (p, u, newGoals) <- bs

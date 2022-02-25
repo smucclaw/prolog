@@ -18,6 +18,7 @@ import Prolog ( Term(..), VariableName, Clause(..), Goal
 
 $(deriveLiftMany [''Term, ''VariableName, ''Clause])
 
+-- see https://github.com/haskell-nix/hnix/issues/652
 instance Lift ([Term] -> [Goal]) where
    lift _ = fail "Clauses using Haskell functions can't be lifted."
 
