@@ -5,7 +5,7 @@ import Control.Applicative ((<*))
 import Data.Functor.Identity (Identity)
 
 import Language.Haskell.TH (listE, varE, viewP, mkName, Q, Exp, Pat)
-import Language.Haskell.TH.Syntax (Lift(lift))
+import Language.Haskell.TH.Syntax (Lift(lift) {- , Quote -} )
 import Language.Haskell.TH.Lift (deriveLiftMany)
 import Language.Haskell.TH.Quote (QuasiQuoter(..))
 import Text.Parsec (parse, eof, ParsecT)
@@ -20,7 +20,7 @@ $(deriveLiftMany [''Term, ''VariableName, ''Clause])
 
 -- see https://github.com/haskell-nix/hnix/issues/652
 instance Lift ([Term] -> [Goal]) where
-   lift _ = fail "Clauses using Haskell functions can't be lifted."
+  lift _ = error "Clauses using Haskell functions can't be lifted."
 
 
 t  = prologQuasiQuoter term    "term"
