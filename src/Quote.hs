@@ -1,11 +1,12 @@
-{-# LANGUAGE TemplateHaskell, FlexibleInstances #-}
+{-# LANGUAGE InstanceSigs, KindSignatures, RankNTypes, TemplateHaskell, FlexibleInstances #-}
 module Quote (t,ts,c,pl) where
 
 import Control.Applicative ((<*))
+import Control.Monad.Fail
 import Data.Functor.Identity (Identity)
 
 import Language.Haskell.TH (listE, varE, viewP, mkName, Q, Exp, Pat)
-import Language.Haskell.TH.Syntax (Lift(lift))
+import Language.Haskell.TH.Syntax (Lift(lift), Quote)
 import Language.Haskell.TH.Lift (deriveLiftMany)
 import Language.Haskell.TH.Quote (QuasiQuoter(..))
 import Text.Parsec (parse, eof, ParsecT)
@@ -19,7 +20,7 @@ import Prolog ( Term(..), VariableName, Clause(..), Goal
 $(deriveLiftMany [''Term, ''VariableName, ''Clause])
 
 instance Lift ([Term] -> [Goal]) where
-   lift _ = fail "Clauses using Haskell functions can't be lifted."
+  lift _ = error "Clauses using Haskell functions can't be lifted."
 
 
 t  = prologQuasiQuoter term    "term"
